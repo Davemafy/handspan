@@ -2,8 +2,19 @@ import { isIP } from 'node:net';
 
 const parseHosts = (raw) => String(raw || '').split(',').map((entry) => entry.trim().toLowerCase()).filter(Boolean);
 
+// These names must never be browsed in open-web mode, even if a caller knows them.
+// This is only a hostname guard: network-level egress isolation is still essential.
+const RESERVED_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa', '.test', '.invalid', '.example', '.onion'];
+function isNonPublicHostname(host) {
+  return !host.includes('.') || host === 'localhost' || host === 'metadata.google.internal'
+    || RESERVED_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 export function settingsFromEnv(env = process.env) {
   const targets = parseHosts(env.TARGET_HOSTS || '');
+  if (targets.includes('*') && env.ENABLE_OPEN_WEB !== 'true') {
+    throw new Error('TARGET_HOSTS=* requires ENABLE_OPEN_WEB=true and an egress-isolated browser deployment');
+  }
   const resources = parseHosts(env.RESOURCE_HOSTS || 'fonts.googleapis.com,fonts.gstatic.com,images.unsplash.com,images.pexels.com,image.tmdb.org');
   const publicHosts = parseHosts([env.MCP_PUBLIC_HOST, env.RAILWAY_PUBLIC_DOMAIN].filter(Boolean).join(','));
   return {
@@ -16,7 +27,7 @@ export function settingsFromEnv(env = process.env) {
   };
 }
 
-/** Host allowlisting is exact. No wildcard or suffix matching. */
+/** Exact allowlist by default; '*' is an explicit opt-in for public HTTPS hostnames only. */
 export function validateUrl(raw, hosts) {
   let url;
   try { url = new URL(raw); } catch { throw new Error('Invalid URL'); }
@@ -24,7 +35,8 @@ export function validateUrl(raw, hosts) {
     throw new Error('Only HTTPS URLs without credentials or custom ports are allowed');
   }
   const host = url.hostname.toLowerCase();
-  if (isIP(host) || host.endsWith('.') || !hosts.includes(host)) {
+  if (isIP(host) || host.endsWith('.') || (hosts.includes('*')
+    ? isNonPublicHostname(host) : !hosts.includes(host))) {
     throw new Error(`Host not allowed: ${host}`);
   }
   return url;
