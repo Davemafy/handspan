@@ -12,7 +12,7 @@ Everyone can self-host the code. Each user keeps their deployment URL, access to
 
 | MCP tool | Capability |
 |---|---|
-| `inspect_site` | Navigate to an approved HTTPS site and return **two real PNG screenshots**, desktop and mobile, plus page/browser diagnostics |
+| `inspect_site` | Navigate to a permitted HTTPS site and return **two real PNG screenshots**, desktop and mobile, plus page/browser diagnostics |
 | `browser_open` | Open a long-lived Chromium session |
 | `browser_screenshot` | Return PNG image content (not a description or URL) |
 | `browser_snapshot` | Read headings, controls, horizontal overflow, failed images, HTTP/JS errors |
@@ -51,7 +51,7 @@ MCP_ACCESS_TOKEN='<server-token>' \
 npm run smoke -- https://example.com
 ```
 
-The smoke test calls the real MCP endpoint and writes `screenshots/desktop.png` and `screenshots/mobile.png`. Screenshot files are gitignored. Update the example URL to a host listed in `TARGET_HOSTS`.
+The smoke test calls the real MCP endpoint and writes `screenshots/desktop.png` and `screenshots/mobile.png`. Screenshot files are gitignored. Update the example URL to a hostname listed in `TARGET_HOSTS`, or use the optional public-web mode below.
 
 ### Publish your own server on Railway
 
@@ -65,6 +65,20 @@ The smoke test calls the real MCP endpoint and writes `screenshots/desktop.png` 
 Your URL and token are private to your deployment. **A private URL alone is not authentication.** All tool calls must pass the configured token. Never use the same token in code examples, public screenshots, PRs, or bug reports.
 
 `Dockerfile` uses a pinned Microsoft Playwright image matching the pinned npm Playwright version. `PORT` is read from Railway automatically.
+
+### Flexible browsing (opt-in)
+
+By default `TARGET_HOSTS` is an exact comma-separated hostname list. If you own the server and want to explore public sites without updating a hostname list each time, you can set:
+
+```dotenv
+TARGET_HOSTS=*
+ENABLE_OPEN_WEB=true
+ENABLE_INTERACTIONS=true
+```
+
+This allows arbitrary **public-looking HTTPS hostnames** and their HTTPS subresources, while rejecting direct IP addresses, localhost, and common private-domain suffixes. Browser interactions are optional and should only be enabled on a trusted, authenticated instance.
+
+**Critical:** Hostname filtering is not SSRF protection against DNS rebinding or private DNS results. **Do not enable open-web mode on Railway without separate network egress isolation** that prevents Chromium from reaching metadata services, localhost or private networks. In the absence of that isolation, keep the explicit allowlist. The MCP endpoint itself always requires a bearer token; this mode does not expose the server anonymously.
 
 ### Add repository and build tools
 
@@ -87,7 +101,7 @@ Handspan uses MCP Streamable HTTP at `https://<your-host>/mcp`, with bearer-toke
 ## Security model
 
 - **Authenticated:** `/mcp` requires a long, constant-time-checked bearer token.
-- **Allowlisted:** Only exact approved HTTPS hostnames, explicit static-resource domains, and approved GitHub repositories/branches can be accessed.
+- **Allowlisted:** Exact HTTPS hostname and GitHub repository allowlists are the default; public-hostname browsing is optionally enabled with `TARGET_HOSTS=*` and `ENABLE_OPEN_WEB=true` on an egress-isolated deployment.
 - **Reduced browser exposure:** No arbitrary file URLs, custom ports, IP-literal targets, service workers, or unrestricted browser sessions. Browser interactions are disabled until explicitly enabled.
 - **Build isolation:** Project code runs only via approved GitHub Actions workflows, never through an arbitrary command-execution MCP tool.
 - **Controlled writes:** GitHub source writes are opt-in, path-restricted, existing-file-only, and require the original blob SHA to guard against overwriting concurrent edits.
