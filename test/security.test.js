@@ -36,3 +36,16 @@ test('bearer authentication requires exact secret', () => {
 test('query strings and fragments never appear in diagnostic URLs', () => {
   assert.equal(safeUrl('https://example.com/path?token=private#frag'), 'https://example.com/path');
 });
+
+test('open web is opt-in and restricts obvious nonpublic hosts', () => {
+  assert.throws(() => settingsFromEnv({ TARGET_HOSTS: '*' }), /ENABLE_OPEN_WEB=true/);
+  const open = settingsFromEnv({ TARGET_HOSTS: '*', ENABLE_OPEN_WEB: 'true' });
+  for (const url of ['https://www.wikipedia.org/wiki/Playwright', 'https://unpkg.com/package', 'https://vercel.app/']) {
+    assert.equal(isAllowedBrowserRequest(url, true, open), true, url);
+  }
+  for (const url of [
+    'http://www.wikipedia.org', 'https://localhost', 'https://localhost.evil.local',
+    'https://router.lan', 'https://metadata.google.internal', 'https://example.test',
+    'https://169.254.169.254', 'https://10.0.0.1', 'https://[::1]', 'https://api',
+  ]) assert.equal(isAllowedBrowserRequest(url, true, open), false, url);
+});
