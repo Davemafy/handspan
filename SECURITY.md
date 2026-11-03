@@ -6,7 +6,7 @@ Handspan can control a browser and read approved source code. Treat the MCP toke
 
 1. Prefer dedicated Railway service and dedicated GitHub fine-grained token.
 2. Never expose the MCP service without authentication. `/health` is deliberately information-minimal.
-3. Use exact hostname allowlists; avoid exposing authenticated administration panels in `TARGET_HOSTS`.
+3. Prefer exact hostname allowlists; avoid exposing authenticated administration panels in `TARGET_HOSTS`. Wildcard public-web mode requires external egress isolation and must not be treated as safe merely because private hostname suffixes are blocked.
 4. Keep `ENABLE_INTERACTIONS=false` and `ENABLE_GITHUB_WRITES=false` unless required.
 5. Keep GitHub workflows on a restricted branch and review workflow edits separately.
 6. Rotate tokens after suspected leaks and keep deployment logs private.
