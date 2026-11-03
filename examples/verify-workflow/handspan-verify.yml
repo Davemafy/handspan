@@ -1,0 +1,39 @@
+# Copy to .github/workflows/handspan-verify.yml in each repository you authorize.
+# Do not expose production secrets to pull requests or unnecessary build steps.
+name: Handspan verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: handspan-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck when configured
+        run: npm run typecheck --if-present
+      - name: Test when configured
+        run: npm test --if-present
+      - name: Production build
+        run: npm run build --if-present
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: handspan-test-results-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+            screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
